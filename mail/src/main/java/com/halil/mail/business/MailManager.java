@@ -1,12 +1,10 @@
 package com.halil.mail.business;
 
-import java.io.UnsupportedEncodingException;
+
 
 import java.util.List;
 
 
-import javax.mail.Session;
-import javax.mail.Transport;
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 
@@ -14,193 +12,153 @@ import javax.mail.internet.MimeMessage;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.halil.mail.dataAccess.IMailDal;
 import com.halil.mail.entity.Mail;
 import com.halil.mail.entity.MailMessage;
 import com.halil.mail.entity.MailMessageDetail;
-import com.halil.mail.helper.MailHelper;
+
 
 @Service
 public class MailManager implements IMail {
 
-	private IMailDal maildal;
+    private IMailDal maildal;
+    private final JavaMailSender mailSender;
 
-	@Autowired
-	public MailManager(IMailDal maildal) {
-		super();
-		this.maildal = maildal;
-	}
+    @Autowired
+    public MailManager(IMailDal maildal, JavaMailSender mailSender) {
+        super();
+        this.maildal = maildal;
+        this.mailSender = mailSender;
+    }
 
-	@Override
-	public List<Mail> getAll() {
-		// TODO Auto-generated method stub
-		return this.maildal.getAll();
-	}
+    @Override
+    public List<Mail> getAll() {
+        // TODO Auto-generated method stub
+        return this.maildal.getAll();
+    }
 
-	@Override
-	public Mail newMail(Mail newMail) {
-		// TODO Auto-generated method stub
-		return this.maildal.newMail(newMail);
-	}
+    @Override
+    public Mail newMail(Mail newMail) {
+        // TODO Auto-generated method stub
+        return this.maildal.newMail(newMail);
+    }
 
-	@Override
-	public Mail getOnebyID(long id) {
-		// TODO Auto-generated method stub
-		return maildal.getOnebyID(id);
-	}
+    @Override
+    public Mail getOnebyID(long id) {
+        // TODO Auto-generated method stub
+        return maildal.getOnebyID(id);
+    }
 
-	@Override
-	public Mail updateMail(Mail newMail, long id) {
-		// TODO Auto-generated method stub
-		return maildal.updateMail(newMail, id);
-	}
+    @Override
+    public Mail updateMail(Mail newMail, long id) {
+        // TODO Auto-generated method stub
+        return maildal.updateMail(newMail, id);
+    }
 
-	@Override
-	public void deleteMail(long id) {
-		// TODO Auto-generated method stub
-		this.maildal.deleteMail(id);
+    @Override
+    public void deleteMail(long id) {
+        // TODO Auto-generated method stub
+        this.maildal.deleteMail(id);
 
-	}
+    }
 
-	public void sendMail(MailMessage msg) {
-		Session session = MailHelper.getSession();
 
-		try {
+    @Async
+    public void sendMail(MailMessage msg) {
 
-			// Create a default MimeMessage object.
 
-			MimeMessage message1 = new MimeMessage(session);
+        try {
 
-			// Set from email address
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(mimeMessage, "utf-8");
+            helper.setText(msg.getMydetail().getMsg(),true);
+            helper.setTo(msg.getMailAddress());
+            helper.setSubject(msg.getMydetail().getSubject());
+            helper.setFrom("emirlerogluhalil@gmail.com");
+            mailSender.send(mimeMessage);
 
-			message1.setFrom(new InternetAddress(MailHelper.getFrom(), "User"));
+        } catch (AddressException e) {
 
-			// Set the recipient email address
+            e.printStackTrace();
 
-			message1.addRecipient(MimeMessage.RecipientType.TO, new InternetAddress(msg.getMailAddress()));
+        } catch (javax.mail.MessagingException e) {
 
-			// Set email subject
+            e.printStackTrace();
 
-			message1.setSubject(msg.getMydetail().getSubject());
+        }
 
-			message1.setText(msg.getMydetail().getMsg());
+    }
+    @Async
+    public void sendMail(MailMessageDetail myDetail, long id) {
 
-			// Set configs for sending email
 
-			Transport transport = session.getTransport("smtp");
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
 
-			transport.connect(MailHelper.getHost(), MailHelper.getFrom(), MailHelper.getPassword());
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(mimeMessage, "utf-8");
+            helper.setText(myDetail.getMsg(), true);
+            helper.setTo(maildal.getOnebyID(id).getMailAddress());
+            helper.setSubject(myDetail.getSubject());
+            helper.setFrom("emirlerogluhalil@gmail.com");
+            mailSender.send(mimeMessage);
 
-			// Send email
 
-			transport.sendMessage(message1, message1.getAllRecipients());
+        } catch (AddressException e) {
 
-			transport.close();
+            e.printStackTrace();
 
-			System.out.println("done");
+        } catch (javax.mail.MessagingException e) {
 
-		} catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
 
-			e.printStackTrace();
+        }
 
-		} catch (AddressException e) {
+    }
 
-			e.printStackTrace();
+    @Override
+    @Async
+    public void sendMailAll(MailMessageDetail myDetail) {
 
-		} catch (javax.mail.MessagingException e) {
+        try {
 
-			e.printStackTrace();
 
-		}
+            List<Mail> emails = this.maildal.getAll();
 
-	}
+            InternetAddress[] addresses = new InternetAddress[emails.size()];
 
-	public void sendMail(MailMessageDetail myDetail, long id) {
-		Session session = MailHelper.getSession();
+            for (int i = 0; i < emails.size(); i++) {
+                addresses[i] = new InternetAddress(emails.get(i).getMailAddress());
 
-		try {
-			MimeMessage message1 = new MimeMessage(session);
-			message1.setFrom(new InternetAddress(MailHelper.getFrom(), "User"));
+            }
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(mimeMessage, "utf-8");
+            helper.setText(myDetail.getMsg(),true);
+            helper.setTo(addresses);
+            helper.setSubject(myDetail.getSubject());
+            helper.setFrom("emirlerogluhalil@gmail.com");
+            mailSender.send(mimeMessage);
 
-			message1.addRecipient(MimeMessage.RecipientType.TO,
-					new InternetAddress(maildal.getOnebyID(id).getMailAddress()));
-			message1.setSubject(myDetail.getSubject());
 
-			message1.setText(myDetail.getMsg());
-			Transport transport = session.getTransport("smtp");
+            System.out.println("done");
 
-			transport.connect(MailHelper.getHost(), MailHelper.getFrom(), MailHelper.getPassword());
-			transport.sendMessage(message1, message1.getAllRecipients());
+        } catch (AddressException e) {
 
-			transport.close();
+            e.printStackTrace();
 
-			System.out.println("done");
-		} catch (UnsupportedEncodingException e) {
+        } catch (javax.mail.MessagingException e) {
 
-			e.printStackTrace();
+            e.printStackTrace();
 
-		} catch (AddressException e) {
+        }
 
-			e.printStackTrace();
-
-		} catch (javax.mail.MessagingException e) {
-
-			e.printStackTrace();
-
-		}
-
-	}
-
-	@Override
-	public void sendMailAll(MailMessageDetail myDetail) {
-		Session session = MailHelper.getSession();
-		try {
-
-			MimeMessage message1 = new MimeMessage(session);
-
-			message1.setFrom(new InternetAddress(MailHelper.getFrom(), "User"));
-
-			List<Mail> emails = this.maildal.getAll();
-
-			InternetAddress[] addresses = new InternetAddress[emails.size()];
-
-			for (int i = 0; i < emails.size(); i++) {
-				addresses[i] = new InternetAddress(emails.get(i).getMailAddress());
-
-			}
-
-			message1.addRecipients(MimeMessage.RecipientType.TO, addresses);
-
-			message1.setSubject(myDetail.getSubject());
-
-			message1.setText(myDetail.getMsg());
-
-			Transport transport = session.getTransport("smtp");
-
-			transport.connect(MailHelper.getHost(), MailHelper.getFrom(), MailHelper.getPassword());
-
-			transport.sendMessage(message1, message1.getAllRecipients());
-
-			transport.close();
-
-			System.out.println("done");
-
-		} catch (UnsupportedEncodingException e) {
-
-			e.printStackTrace();
-
-		} catch (AddressException e) {
-
-			e.printStackTrace();
-
-		} catch (javax.mail.MessagingException e) {
-
-			e.printStackTrace();
-
-		}
-
-	}
+    }
 
 }
